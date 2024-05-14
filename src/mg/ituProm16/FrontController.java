@@ -6,6 +6,11 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import mg.ituProm16.annotation.Controller;
+import java.util.*;
+import java.io.*;
+import java.text.*;
+
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -16,31 +21,30 @@ public class FrontController extends HttpServlet {
 
     public void init() throws ServletException {
         try{
-            packageName = getInitParameter("package-sources");
+            packageName = getInitParameter("package-source");
         } catch (Exception e){
             e.printStackTrace();
         }
     }
 
-    public List<Class> getListController() {
-        List<Class> list = new ArrayList();
+    public void getListController() throws Exception {
+        listController = new ArrayList();
         ServletContext context = getServletContext();
-        String path = context.getResource(packageName).getPath();
+        String path = context.getResource(this.packageName).getPath();
         File file = new File(path);
         for (File f : file.listFiles()) {
             if(f.isFile() && file.getName().endsWith(".class")) {
                 String className = f.getName().substring(0, file.getName().length() - 6);
-                Class class = Thread.currentThread().getContextClassLoader().loadClass(className);
-                if (class.isAnnotationPresent(Controller.class)) {
-                    list.add(class);
+                Class<?> MyClass = Thread.currentThread().getContextClassLoader().loadClass(className);
+                if (MyClass.isAnnotationPresent(Controller.class)) {
+                    listController.add(MyClass);
                 }
             }
         }
-        return list;
     }
-    public void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    public void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException, Exception {
         resp.setContentType("text/plain");
-        ServletOutputStream out = response.getOutputStream();
+        ServletOutputStream out = resp.getOutputStream();
         String result="";
         if (listController!=null){
             for (int i = 0; i< listController.size(); i++) {
@@ -52,7 +56,7 @@ public class FrontController extends HttpServlet {
                 result += listController.get(i).getName() + "\n";
             }
         }
-        out.whrite((result).getBytes());
+        out.write((result).getBytes());
         out.close();
     }
     @Override

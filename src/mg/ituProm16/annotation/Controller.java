@@ -1,8 +1,8 @@
-package mg.ituProm16.annotaion;
+package mg.ituProm16.annotation;
 
-import java.lang.annotaion.Retention;
-import java.lang.annotaion.RetentionPolicy;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 
-@Rentention(RetentionPolicy.RUNTIME)
- public @interface Controller {}
+@Retention(RetentionPolicy.RUNTIME)
+public @interface Controller {}
 
