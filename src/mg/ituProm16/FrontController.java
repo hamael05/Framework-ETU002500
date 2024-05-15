@@ -27,20 +27,28 @@ public class FrontController extends HttpServlet {
         }
     }
 
+    public String modifierClassPath(String classpath) {
+        classpath = classpath.substring(1);
+        classpath = classpath.replace("%20", " ");
+        return classpath;
+    }  
+
     public void getListController() throws Exception {
-        listController = new ArrayList();
-        ServletContext context = getServletContext();
-        String path = context.getResource(this.packageName).getPath();
-        File file = new File(path);
-        for (File f : file.listFiles()) {
-            if(f.isFile() && file.getName().endsWith(".class")) {
-                String className = f.getName().substring(0, file.getName().length() - 6);
-                Class<?> MyClass = Thread.currentThread().getContextClassLoader().loadClass(className);
-                if (MyClass.isAnnotationPresent(Controller.class)) {
-                    listController.add(MyClass);
+        ServletContext servletContext = getServletContext();
+        String classpath =this.modifierClassPath(servletContext.getResource(this.packageName).getPath());
+        File classPathDirectory = new File(classpath);
+        this.listController = new Vector<Class>();
+        
+        for(File file : classPathDirectory.listFiles()) {
+            if (file.isFile() && file.getName().endsWith(".class")) {
+                String className = file.getName().substring(0, file.getName().length() - 6);
+                Class<?> class1 = Thread.currentThread().getContextClassLoader().loadClass(this.packageName.split("classes/")[1].replace("/", ".") + className);
+                if (class1.isAnnotationPresent(Controller.class)) {
+                    this.listController.add(class1);
                 }
             }
-        }
+        }    
+        
     }
     public void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException, Exception {
         resp.setContentType("text/plain");
