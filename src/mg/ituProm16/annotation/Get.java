@@ -1,4 +1,4 @@
-package mg.ituProm16.annotations;
+package mg.ituProm16.annotation;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.ElementType;

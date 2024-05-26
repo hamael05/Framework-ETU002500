@@ -9,10 +9,10 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;
 import java.lang.annotation.RetentionPolicy;
 
-import mg.ituProm16.annotations.*;
+import mg.ituProm16.annotation.*;
 
 public class Utilitaire {
-    public static void scan (Class clazz, HashMap<String, Mapping> hashMap){
+    public static void scan (Class<?> clazz, HashMap<String, Mapping> hashMap) throws Exception {
         Method[] methods = clazz.getDeclaredMethods();
         for (Method method : methods) {
             if (method.isAnnotationPresent(Get.class)){
@@ -22,8 +22,8 @@ public class Utilitaire {
         }
     }
 
-    public static void scanAllClasses (List<Class> classes, HashMap<String, Mapping> hashMap) {
-        for (Class clazz : classes) {
+    public static void scanAllClasses (List<Class<?>> classes, HashMap<String, Mapping> hashMap) throws Exception {
+        for (Class<?> clazz : classes) {
             scan(clazz, hashMap);
         }
     }
