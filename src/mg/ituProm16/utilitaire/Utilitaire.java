@@ -9,7 +9,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;
 import java.lang.annotation.RetentionPolicy;
 
-import mg.ituProm16.annotation.*;
+import mg.ituProm16.annotations.*;
 
 public class Utilitaire {
     public static void scan (Class clazz, HashMap<String, Mapping> hashMap){

@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import mg.ituProm16.annotation.*;
+import mg.ituProm16.annotations.*;
 import mg.ituProm16.utilitaire.*;
 
 import java.util.*;
@@ -68,15 +69,14 @@ public class FrontController extends HttpServlet {
             for (int i = 0; i< listController.size(); i++) {
                 result += listController.get(i).getName() + "\n";
             }
-            utilitaire.scanAllClasses(listController, hashMap);
+        }
+        utilitaire.scanAllClasses(listController, hashMap);
             result += "annoted method: \n";
             for(Map.Entry<String, Mapping> entry : hashMap.entrySet()){
                 String key = entry.getKey();
                 Mapping mapping = entry.getValue();
                 result += "key : " + key + " ; value : " + mapping.getMethodName() +" in class " + mapping.getClassName();
             }
-
-        }
         out.write((result).getBytes());
         out.close();
     }
