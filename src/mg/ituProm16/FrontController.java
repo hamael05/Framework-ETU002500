@@ -6,7 +6,10 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import mg.ituProm16.annotation.Controller;
+
+import mg.ituProm16.annotation.*;
+import mg.ituProm16.utilitaire.*;
+
 import java.util.*;
 import java.io.*;
 import java.text.*;
@@ -17,11 +20,13 @@ import java.io.PrintWriter;
 
 public class FrontController extends HttpServlet {
     String packageName;
-    List<Class> listController;
+    List<Class<?>> listController;
+    HashMap<String, Mapping> hashMap;
 
     public void init() throws ServletException {
         try{
             packageName = getInitParameter("package-source");
+            hashMap = new HashMap<>(); // Initialisation de hashMap
         } catch (Exception e){
             e.printStackTrace();
         }
@@ -37,7 +42,7 @@ public class FrontController extends HttpServlet {
         ServletContext servletContext = getServletContext();
         String classpath =this.modifierClassPath(servletContext.getResource(this.packageName).getPath());
         File classPathDirectory = new File(classpath);
-        this.listController = new Vector<Class>();
+        this.listController = new ArrayList<Class<?>>();
         
         for(File file : classPathDirectory.listFiles()) {
             if (file.isFile() && file.getName().endsWith(".class")) {
@@ -53,17 +58,25 @@ public class FrontController extends HttpServlet {
     public void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException, Exception {
         resp.setContentType("text/plain");
         ServletOutputStream out = resp.getOutputStream();
-        String result="";
-        if (listController!=null){
-            for (int i = 0; i< listController.size(); i++) {
-                result += listController.get(i).getName() + "\n";
-            }
-        } else {
+        String result="Controller : \n";
+        if (listController==null){
             getListController();
-            for (int i = 0; i< listController.size(); i++) {
-                result += listController.get(i).getName() + "\n";
-            }
         }
+        for (int i = 0; i< listController.size(); i++) {
+            result += listController.get(i).getName() + " "+i+" \n";
+        }
+
+        result += "annoted method: \n";
+    
+            Utilitaire utilitaire = new Utilitaire();
+            utilitaire.scanAllClasses(listController, hashMap);
+            for(Map.Entry<String, Mapping> entry : hashMap.entrySet()){
+                String key = entry.getKey();
+                Mapping mapping = entry.getValue();
+                result += "key : " + key + " ; method : " + mapping.getMethodName() +" in class " + mapping.getClassName() + "\n";
+            }
+            
+
         out.write((result).getBytes());
         out.close();
     }
