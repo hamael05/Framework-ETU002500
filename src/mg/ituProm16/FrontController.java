@@ -1,4 +1,4 @@
-package src.mg.ituProm16;
+package mg.ituProm16;
 
 import jakarta.servlet.*;
 import jakarta.servlet.ServletException;
@@ -7,14 +7,13 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import mg.ituProm16.annotation.Get;
-import mg.ituProm16.annotation.Controller;
-import mg.ituProm16.utilitaire.Mapping;
-import mg.ituProm16.utilitaire.Utilitaire;
+import mg.ituProm16.annotation.*;
+import mg.ituProm16.utilitaire.*;
 
 import java.util.*;
 import java.io.*;
 import java.text.*;
+import java.lang.reflect.Method;
 
 
 import java.io.IOException;
@@ -57,27 +56,47 @@ public class FrontController extends HttpServlet {
         }    
         
     }
+    public String getkeyHash(HttpServletRequest req, HttpServletResponse resp) {
+        String urlPath = req.getRequestURL().toString();
+        String[] urlSplit = urlPath.split("/");
+        String key = "/";
+        for (int i = 4; i < urlSplit.length; i++) {
+            key += urlSplit[i];
+            if ( i < urlSplit.length-1 ){
+                key += "/";
+            }
+        }
+        return key;
+    }
     public void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException, Exception {
         resp.setContentType("text/plain");
         ServletOutputStream out = resp.getOutputStream();
         String result="Controller : \n";
+        String urlPath = req.getRequestURL().toString();
+
+        String keyHash = getkeyHash(req, resp);
+
         if (listController==null){
             getListController();
         }
-        for (int i = 0; i< listController.size(); i++) {
-            result += listController.get(i).getName() + " "+i+" \n";
-        }
-
-        result += "annoted method: \n";
-    
             Utilitaire utilitaire = new Utilitaire();
             utilitaire.scanAllClasses(listController, hashMap);
-            for(Map.Entry<String, Mapping> entry : hashMap.entrySet()){
-                String key = entry.getKey();
-                Mapping mapping = entry.getValue();
-                result += "key : " + key + " ; method : " + mapping.getMethodName() +" in class " + mapping.getClassName() + "\n";
-            }
-            
+      
+        
+        if(!hashMap.containsKey(keyHash)){
+            result+="No mapping found";
+        } else {
+            Mapping m = hashMap.get(keyHash);
+            result+="mapping found ; with method :" + m.getMethodName() + " in " + m.getClassName() +" for url : " + keyHash + " \n"; 
+
+            Class myclass = Class.forName(m.getClassName());
+            Object myobject = myclass.getDeclaredConstructor(new Class[0]).newInstance(new Object[0]);
+            Method method = myclass.getDeclaredMethod(m.getMethodName(), new Class[0]);
+            result+="method value : " + (String) (method.invoke(myobject, new Object[0])) + "\n";
+        }
+
+
+
 
         out.write((result).getBytes());
         out.close();
