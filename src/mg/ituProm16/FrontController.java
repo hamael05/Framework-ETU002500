@@ -1,4 +1,4 @@
-package mg.ituProm16;
+package src.mg.ituProm16;
 
 import jakarta.servlet.*;
 import jakarta.servlet.ServletException;
@@ -7,8 +7,10 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import mg.ituProm16.annotation.*;
-import mg.ituProm16.utilitaire.*;
+import mg.ituProm16.annotation.Get;
+import mg.ituProm16.annotation.Controller;
+import mg.ituProm16.utilitaire.Mapping;
+import mg.ituProm16.utilitaire.Utilitaire;
 
 import java.util.*;
 import java.io.*;
