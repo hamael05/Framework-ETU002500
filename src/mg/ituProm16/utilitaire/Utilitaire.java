@@ -9,6 +9,11 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;
 import java.lang.annotation.RetentionPolicy;
 
+import java.util.*;
+import java.io.*;
+import java.text.*;
+import java.lang.reflect.Method; 
+
 import mg.ituProm16.annotation.*;
 
 public class Utilitaire {
@@ -28,7 +33,18 @@ public class Utilitaire {
         }
     }
 
-    
+    public static Object methodInvoke(HashMap<String, Mapping> hashMap, String key) throws Exception {
+        Object result = new Object();
+
+        if(hashMap.containsKey(key)){
+            Mapping m = hashMap.get(key);
+            Class myclass = Class.forName(m.getClassName());
+            Object myobject = myclass.getDeclaredConstructor(new Class[0]).newInstance(new Object[0]);
+            Method method = myclass.getDeclaredMethod(m.getMethodName(), new Class[0]);
+            result=method.invoke(myobject, new Object[0]) ;
+        } 
+        return result;
+    }
 
 
 }

@@ -12,6 +12,10 @@ public class ModelView {
         this.data = data;
     }
 
+    public ModelView(String url){
+        this.url = url;
+    }
+
     public ModelView(){}
 
     public String getUrl(){
