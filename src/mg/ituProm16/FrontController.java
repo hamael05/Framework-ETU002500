@@ -96,9 +96,6 @@ public class FrontController extends HttpServlet {
             }
             dispatcher.forward(req, resp);
         }
-
-
-
         PrintWriter out = resp.getWriter();
         out.println(toPrint);
         out.close();
