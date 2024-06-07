@@ -27,6 +27,9 @@ public class FrontController extends HttpServlet {
     public void init() throws ServletException {
         try{
             packageName = getInitParameter("package-source");
+            if (listController==null){
+                getListController();
+            }
             hashMap = new HashMap<>(); // Initialisation de hashMap
         } catch (Exception e){
             e.printStackTrace();
@@ -68,37 +71,33 @@ public class FrontController extends HttpServlet {
         }
         return key;
     }
-    public void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException, Exception {
-        resp.setContentType("text/plain");
-        ServletOutputStream out = resp.getOutputStream();
-        String result="Controller : \n";
+
+    
+
+    public void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException, Exception {        
+        String toPrint = "Value of method= " ;
         String urlPath = req.getRequestURL().toString();
 
         String keyHash = getkeyHash(req, resp);
-
-        if (listController==null){
-            getListController();
-        }
-            Utilitaire utilitaire = new Utilitaire();
-            utilitaire.scanAllClasses(listController, hashMap);
+        Utilitaire utilitaire = new Utilitaire();
+        utilitaire.scanAllClasses(listController, hashMap);
       
+        Object result = utilitaire.methodInvoke(hashMap, keyHash);
         
-        if(!hashMap.containsKey(keyHash)){
-            result+="No mapping found";
+        if (result instanceof String) {
+            toPrint += (String) result + " / url : " + keyHash;
         } else {
-            Mapping m = hashMap.get(keyHash);
-            result+="mapping found ; with method :" + m.getMethodName() + " in " + m.getClassName() +" for url : " + keyHash + " \n"; 
-
-            Class myclass = Class.forName(m.getClassName());
-            Object myobject = myclass.getDeclaredConstructor(new Class[0]).newInstance(new Object[0]);
-            Method method = myclass.getDeclaredMethod(m.getMethodName(), new Class[0]);
-            result+="method value : " + (String) (method.invoke(myobject, new Object[0])) + "\n";
+            ModelView view = (ModelView) result;
+            RequestDispatcher dispatcher = req.getRequestDispatcher(view.getUrl());
+            HashMap<String, Object> data = view.getData();
+            Set<String> keys = data.keySet();
+            for (String key : keys) {
+                req.setAttribute(key, data.get(key));
+            }
+            dispatcher.forward(req, resp);
         }
-
-
-
-
-        out.write((result).getBytes());
+        PrintWriter out = resp.getWriter();
+        out.println(toPrint);
         out.close();
     }
     @Override
