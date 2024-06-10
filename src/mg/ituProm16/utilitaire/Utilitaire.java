@@ -23,7 +23,6 @@ public class Utilitaire {
             if (method.isAnnotationPresent(Get.class)){
                 Get get = method.getAnnotation(Get.class);
                 hashMap.put(get.value(), new Mapping(clazz.getName(), method.getName()));
-                
             }
         }
     }
