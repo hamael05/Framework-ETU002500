@@ -31,7 +31,11 @@ public class FrontController extends HttpServlet {
                 getListController();
             }
             hashMap = new HashMap<>(); // Initialisation de hashMap
-        } catch (Exception e){
+        } 
+        catch (NullPointerException en) {
+            throw new Error("No package", en);
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -75,30 +79,42 @@ public class FrontController extends HttpServlet {
     
 
     public void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException, Exception {        
-        String toPrint = "Value of method= " ;
-        String urlPath = req.getRequestURL().toString();
+        try{
+            String toPrint = "Value of method= " ;
+            String urlPath = req.getRequestURL().toString();
 
-        String keyHash = getkeyHash(req, resp);
-        Utilitaire utilitaire = new Utilitaire();
-        utilitaire.scanAllClasses(listController, hashMap);
-      
-        Object result = utilitaire.methodInvoke(hashMap, keyHash);
+            String keyHash = getkeyHash(req, resp);
+            Utilitaire utilitaire = new Utilitaire();
+            utilitaire.scanAllClasses(listController, hashMap);
         
-        if (result instanceof String) {
-            toPrint += (String) result + " / url : " + keyHash;
-        } else {
-            ModelView view = (ModelView) result;
-            RequestDispatcher dispatcher = req.getRequestDispatcher(view.getUrl());
-            HashMap<String, Object> data = view.getData();
-            Set<String> keys = data.keySet();
-            for (String key : keys) {
-                req.setAttribute(key, data.get(key));
+            Object result = utilitaire.methodInvoke(hashMap, keyHash);
+            
+            if (result instanceof String) {
+                toPrint += (String) result + " / url : " + keyHash;
+            } else if (result instanceof ModelView) {
+                ModelView view = (ModelView) result;
+                RequestDispatcher dispatcher = req.getRequestDispatcher(view.getUrl());
+                HashMap<String, Object> data = view.getData();
+                Set<String> keys = data.keySet();
+                for (String key : keys) {
+                    req.setAttribute(key, data.get(key));
+                }
+                dispatcher.forward(req, resp);
             }
-            dispatcher.forward(req, resp);
+            else {
+                throw new Exception("Ereur de type");
+            }
+            PrintWriter out = resp.getWriter();
+            out.println(toPrint);
+            out.close();
+        } catch (Exception e){
+            e.printStackTrace();
+            if (e instanceof IllegalArgumentException){
+                resp.sendError(400, e.getMessage());
+            } else {
+                resp.sendError(500, e.getMessage());
+            }
         }
-        PrintWriter out = resp.getWriter();
-        out.println(toPrint);
-        out.close();
     }
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {

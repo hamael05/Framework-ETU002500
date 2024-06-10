@@ -22,7 +22,11 @@ public class Utilitaire {
         for (Method method : methods) {
             if (method.isAnnotationPresent(Get.class)){
                 Get get = method.getAnnotation(Get.class);
-                hashMap.put(get.value(), new Mapping(clazz.getName(), method.getName()));
+                if (hashMap.containsKey(get.value())){
+                    throw new Exception("URL en trop");
+                } else {
+                    hashMap.put(get.value(), new Mapping(clazz.getName(), method.getName()));
+                }
             }
         }
     }
@@ -43,6 +47,9 @@ public class Utilitaire {
             Method method = myclass.getDeclaredMethod(m.getMethodName(), new Class[0]);
             result=method.invoke(myobject, new Object[0]) ;
         } 
+        else{
+            throw new IllegalArgumentException("No URL found for key ");
+        }
         return result;
     }
 
