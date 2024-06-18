@@ -31,8 +31,15 @@ public class FrontController extends HttpServlet {
                 getListController();
             }
             hashMap = new HashMap<>(); // Initialisation de hashMap
-        } catch (Exception e){
+            Utilitaire utilitaire = new Utilitaire();
+            utilitaire.scanAllClasses(listController, hashMap);
+        } 
+        catch(NullPointerException npe){
+            throw new Error("No package source", npe);
+        }
+        catch (Exception e){
             e.printStackTrace();
+            throw new Error(e.getMessage());
         }
     }
 
@@ -74,31 +81,49 @@ public class FrontController extends HttpServlet {
 
     
 
-    public void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException, Exception {        
-        String toPrint = "Value of method= " ;
-        String urlPath = req.getRequestURL().toString();
+    public void processRequest(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException, Exception {   
+        try {
+            String toPrint = "Value of method= " ;
+            String urlPath = req.getRequestURL().toString();
 
-        String keyHash = getkeyHash(req, resp);
-        Utilitaire utilitaire = new Utilitaire();
-        utilitaire.scanAllClasses(listController, hashMap);
-      
-        Object result = utilitaire.methodInvoke(hashMap, keyHash);
-        
-        if (result instanceof String) {
-            toPrint += (String) result + " / url : " + keyHash;
-        } else {
-            ModelView view = (ModelView) result;
-            RequestDispatcher dispatcher = req.getRequestDispatcher(view.getUrl());
-            HashMap<String, Object> data = view.getData();
-            Set<String> keys = data.keySet();
-            for (String key : keys) {
-                req.setAttribute(key, data.get(key));
+            String keyHash = getkeyHash(req, resp);
+            Utilitaire utilitaire = new Utilitaire();
+
+            Map<String, String[]> arguments = req.getParameterMap();
+            HashMap<String, String> argument = new HashMap<>();
+            Set<String> paramkeys = arguments.keySet();
+            for (String key : paramkeys) {
+                argument.put(key, arguments.get(key)[0]);
             }
-            dispatcher.forward(req, resp);
-        }
-        PrintWriter out = resp.getWriter();
-        out.println(toPrint);
-        out.close();
+        
+            Object result = utilitaire.methodInvoke(hashMap, keyHash, argument);
+            
+            if (result instanceof String) {
+                toPrint += (String) result + " / url : " + keyHash;
+            } else if (result instanceof ModelView) {
+                ModelView view = (ModelView) result;
+                RequestDispatcher dispatcher = req.getRequestDispatcher(view.getUrl());
+                HashMap<String, Object> data = view.getData();
+                Set<String> keys = data.keySet();
+                for (String key : keys) {
+                    req.setAttribute(key, data.get(key));
+                }
+                dispatcher.forward(req, resp);
+            } else {
+                throw new Exception("Incompatible type");
+            }
+            PrintWriter out = resp.getWriter();
+            out.println(toPrint);
+            out.close();
+        }   
+        catch(Exception e){
+            if(e instanceof IllegalArgumentException) {
+                resp.sendError(400, e.getMessage());
+            } else {
+                resp.sendError(500, e.getMessage());
+            }
+        }  
+        
     }
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
