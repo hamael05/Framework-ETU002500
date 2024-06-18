@@ -88,8 +88,15 @@ public class FrontController extends HttpServlet {
 
             String keyHash = getkeyHash(req, resp);
             Utilitaire utilitaire = new Utilitaire();
+
+            Map<String, String[]> arguments = req.getParameterMap();
+            HashMap<String, String> argument = new HashMap<>();
+            Set<String> paramkeys = arguments.keySet();
+            for (String key : paramkeys) {
+                argument.put(key, arguments.get(key)[0]);
+            }
         
-            Object result = utilitaire.methodInvoke(hashMap, keyHash);
+            Object result = utilitaire.methodInvoke(hashMap, keyHash, argument);
             
             if (result instanceof String) {
                 toPrint += (String) result + " / url : " + keyHash;

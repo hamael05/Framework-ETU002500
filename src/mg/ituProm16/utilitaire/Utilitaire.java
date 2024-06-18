@@ -1,8 +1,10 @@
 package mg.ituProm16.utilitaire;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.ElementType;
@@ -12,7 +14,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.*;
 import java.io.*;
 import java.text.*;
-import java.lang.reflect.Method; 
+
 
 import mg.ituProm16.annotation.*;
 
@@ -38,17 +40,49 @@ public class Utilitaire {
         }
     }
 
-    public static Object methodInvoke(HashMap<String, Mapping> hashMap, String key) throws Exception {
+    public static Method getMethodToUse (String key, Method[] isMethod) throws Exception {
+        for (int i = 0; i < isMethod.length; i++) {
+            if (isMethod[i].isAnnotationPresent(Get.class) ) {
+                Get annotation = isMethod[i].getAnnotation(Get.class);
+                if (annotation.value().equals(key)) {
+                    return isMethod[i];
+                }
+            }
+        }
+        return null;
+    }
+
+    public static Object methodInvoke(HashMap<String, Mapping> hashMap, String key,HashMap<String, String> parameters) throws Exception {
         Object result = new Object();
 
-        if(hashMap.containsKey(key)){
-            Mapping m = hashMap.get(key);
-            Class myclass = Class.forName(m.getClassName());
-            Object myobject = myclass.getDeclaredConstructor(new Class[0]).newInstance(new Object[0]);
-            Method method = myclass.getDeclaredMethod(m.getMethodName(), new Class[0]);
-            result=method.invoke(myobject, new Object[0]) ;
-        } else {
-            throw new IllegalArgumentException("No URL detected");
+        for (int j = 0; j < hashMap.size(); j++) {
+            if (hashMap.get(key) != null) {
+                Mapping mapping = hashMap.get(key);
+                Class myclass = Class.forName(mapping.getClassName());
+                Method[] methods = myclass.getMethods();
+                Method myMethod = Utilitaire.getMethodToUse(key, methods);
+                Parameter[] myParameters = myMethod.getParameters();
+                Object[] methodAttributs = new Object[myParameters.length];
+            
+                int count = 0;
+                for (int i = 0; i < myParameters.length; i++) {
+                    if (myParameters[i].isAnnotationPresent(Param.class)) {
+                        Param annotation = myParameters[i].getAnnotation(Param.class);
+                        methodAttributs[count] = parameters.get(annotation.value());
+                        count++;
+                    } else if (parameters.containsKey(myParameters[i].getName())) {
+                        methodAttributs[count] = parameters.get(myParameters[i].getName());
+                        count++;
+
+                    }
+                }
+                Object myobject = myclass.getDeclaredConstructor(new Class[0]).newInstance(new Object[0]);
+                result = myMethod.invoke(myobject, methodAttributs);
+                return result;
+            }
+            else {
+                throw new IllegalArgumentException("No URL detected");
+            }
         }
         return result;
     }
