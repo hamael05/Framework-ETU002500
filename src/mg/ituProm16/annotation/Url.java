@@ -7,5 +7,7 @@ import java.lang.annotation.RetentionPolicy;
 
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Get {}
+public @interface Url {
+    String value() default "/";
+}
 
