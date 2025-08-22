@@ -1,11 +1,12 @@
-set "jdk_path=C:\Program Files\Java\jdk-17"
+@echo off
+set "jar=jakarta.servlet-api-6.1.0-M2.jar"
+set "jar2=gson-2.10.1.jar"
 
-mkdir /s /q tempjava
-mkdir javacompiler
-mkdir tempjava
-for /r src %%f in (*.java) do (
-    copy /y "%%f" tempjava\
-)
+rem Compilation des fichiers Java
+javac -d "src" -cp "%jar%;%jar2%" src/*.java
 
-"%jdk_path%\bin\javac" -parameters -d javacompiler tempjava\*.java
-"%jdk_path%\bin\jar" cf framework-ETU002500.jar -C javacompiler\ .
+rem Création du fichier .jar
+cd src
+jar -cvf FrontController.jar servlet annotation mapping utility modelview exception session 
+
+pause
