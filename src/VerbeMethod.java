@@ -32,7 +32,6 @@ public class VerbeMethod {
         VerbeMethod vm = (VerbeMethod) o;
         return Objects.equals(verb, vm.verb) && Objects.equals( method, vm.method ); // Compare les propriétés
     }
-
     // Redéfinir hashCode() pour générer un hash basé sur le nom et la couleur
     @Override
     public int hashCode() {

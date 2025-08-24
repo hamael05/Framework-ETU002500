@@ -19,8 +19,10 @@ import modelview.ModelView ;
 import exception.* ;
 import java.lang.annotation.Annotation;
 import com.google.gson.Gson;
+import jakarta.servlet.http.Part;
+import jakarta.servlet.annotation.MultipartConfig;
 
-
+@MultipartConfig
 public class FrontController extends HttpServlet {
     
 
@@ -132,73 +134,62 @@ public class FrontController extends HttpServlet {
     
     public void ShowResultJson( boolean boolRestapi , Object res , PrintWriter out ,  HttpServletRequest request  ,  HttpServletResponse response  ) throws TypeErrorException 
     {
-        if( boolRestapi ) { 
             response.setContentType("application/json");
             Gson gson = new Gson();
+            boolean responseSent = false;
             if (  res instanceof ModelView ) 
             { 
-                ((ModelView)res).getUrl() ; 
-                String jsonUrl = gson.toJson(((ModelView)res).getUrl()) ; 
-                String jsonData = gson.toJson(((ModelView)res).getData()); 
-                String jsonData2 = gson.toJson(((ModelView)res).getData().get("DataUser")); 
-                out.print("Url json  :" + jsonUrl + "\n") ; 
-                out.write("Data json write  :" + jsonData  + "\n") ; 
-            }else { 
-                String json = gson.toJson(res) ; 
-                out.print( "Data not mv : " + res  + '\n'  ) ; 
-            }
-        }else{
-            if( res instanceof String)
-            {  out.print("Valeur de la methode String :" + res + "\n") ; } 
-            else if( res instanceof ModelView)
-            {   this.dispacthModelView( (ModelView)res , request , response); }
-            else { throw new TypeErrorException(" Error Type of return incorrect methode "); }   
-        }    
-    } 
+                if( boolRestapi ) { 
+                    ((ModelView)res).getUrl() ; 
+                    String jsonUrl = gson.toJson(((ModelView)res).getUrl()) ; 
+                    String jsonData = gson.toJson(((ModelView)res).getData()); 
+                    String jsonData2 = gson.toJson(((ModelView)res).getData().get("DataUser")); 
+                    out.print("Url json  :" + jsonUrl + "\n") ; 
+                    out.write("Data json write  :" + jsonData  + "\n") ; 
+                } else { 
+                    this.dispacthModelView( (ModelView)res , request , response); 
+                }
+            }else if( res instanceof String){ 
+                if( boolRestapi ){
+                    String json = gson.toJson(res) ; 
+                    out.print( "Data not mv : " + res  + '\n'  ) ; 
+                }else{ out.print("Valeur de la methode String :" + res + "\n") ;  }
+            }else { throw new TypeErrorException(" Error Type of return incorrect methode "); }
+
+    }
     public void ShowResult(Mapping value  , String methodName , PrintWriter out  , HttpServletRequest request  ,  HttpServletResponse response  )throws TypeErrorException ,Exception
     {
         try { 
-               // out.print("Classe Name : " + value.getClasseName() + " , " + "Methode Name : " + value.getMethodeName() + "\n");
                 Class myClass = Class.forName(value.getClasseName());
-                Method myMethod = this.util.checkMethod(myClass, methodName  ) ;  
-                ArrayList<Object> valueArg = this.util.verifyCorrespondence( request , myMethod  , out ) ;
+                Method myMethod = this.util.checkMethod(myClass, methodName ) ;  
+                ArrayList<Object> valueArg = this.util.verifyCorrespondence( request , response , myMethod  , out ) ;
                 this.util.verifyCorrespondenceFieldSession(myClass , request ) ;
                 Object myObject = myClass.getDeclaredConstructor(new Class[0]).newInstance(new Object[0]) ; 
                 Object res = this.util.invokingMethod( valueArg , myObject , myMethod ) ; 
                 boolean boolRestapi = this.verifyAnnotaionrRestApi( myMethod ) ; 
                 this.setObjectParam(myMethod, valueArg, request , out); 
                 this.ShowResultJson(boolRestapi, res , out , request , response  );
-
         }catch(Exception e )
         {  e.printStackTrace();  }
     }
-
-
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)throws TypeErrorException ,Exception  , IllegalArgumentException
     {  
         PrintWriter out = response.getWriter() ; 
         try{
             StringBuffer url = request.getRequestURL();
             String urlString = url.toString();
-            String transformed = this.util.transformPath2(urlString) ;   
-            Mapping mapping = hashmapUtility.get(transformed);   
-            if(mapping == null) {
-                //throw new Exception("404 error , url incorrect");
-                out.print("404 error , url incorrect") ; 
+            String transformedUrl = this.util.transformPath2(urlString) ;   
+            Mapping mapping = this.hashmapUtility.get(transformedUrl);   
+            System.out.println(" transforme Url ::: " + transformedUrl  + "\n") ;  
+            if(mapping == null) { out.print("404 error , url incorrect"); } 
+            else {     
+                        HashSet<VerbeMethod> ls_verbeMethod = mapping.getVerbeMethods() ;  
+                        for ( VerbeMethod method : ls_verbeMethod) { 
+                            if ( method.getVerb().equals( request.getMethod() )) { 
+                                this.ShowResult(mapping , method.getMethod()  ,  out , request , response ); 
+                            }else {   out.print("error 500\n") ;  }          
+                       }
             }
-            else
-            {  
-                HashSet<VerbeMethod> ls_verbeMethod = mapping.getVerbeMethods() ; 
-                for ( VerbeMethod method : ls_verbeMethod) { 
-                    if ( method.getVerb().equals( request.getMethod() )) { 
-                        this.ShowResult(mapping , method.getMethod()  ,  out , request , response ); 
-                    }else { //throw new Exception("500 error , conflict method form ")
-                     out.print("500 error , conflict method form");
-                    }
-                }
-            }
-                    
-
         }catch( Exception e ) 
         {
             request.setAttribute("errorMessage", e.getMessage());
@@ -206,8 +197,6 @@ public class FrontController extends HttpServlet {
             dispatcher.forward(request, response);
         }
     }
-    
-
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)throws ServletException, IOException{
         try{
