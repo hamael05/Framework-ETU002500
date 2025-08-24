@@ -22,7 +22,8 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletResponse; 
 import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.* ;
-import session.MySession; 
+import session.MySession;
+import vm.VerbeMethod; 
 
 public class Utility {
     public Utility()
@@ -126,8 +127,21 @@ public class Utility {
         String newValue = firstChar + value.substring(1);
         return newValue ;
     }   
+    public String checkVerbe(Method method ) { 
+        try {
+            if( method.isAnnotationPresent(AnnotationGet.class) )
+            { return "GET";  }
+            if( method.isAnnotationPresent(AnnotationPost.class) )
+            { return "POST" ; } 
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+        return "GET" ; // annotation get default  
+    }
 
-    public void AddMethodeAnnotation( String normalizedPath , String packageName  , HashMap HashmapUtility) throws Exception 
+
+    //Scan url 
+    public void AddMethodeAnnotation( String normalizedPath , String packageName  , HashMap hashmapUtility) throws Exception 
     {  
         try {    
 
@@ -142,22 +156,7 @@ public class Utility {
                             Class<?> myclass = Thread.currentThread().getContextClassLoader().loadClass(trueClassName) ; 
                                 if(myclass.isAnnotationPresent(AnnotationController.class))
                                 {
-                                        Method [] methods = myclass.getDeclaredMethods() ;
-                                        //Liste de Methode pour chaque Classe 
-                                        for (Method method : methods)
-                                            if(method.isAnnotationPresent(AnnotationGet.class))  
-                                            {
-                                                AnnotationGet annotation = method.getAnnotation(AnnotationGet.class);
-                                                AnnotationRestapi annotationApi = method.getAnnotation(AnnotationRestapi.class);
-                                                String url = "" ; 
-                                                if ( annotation != null ) {  url = annotation.name(); }
-                                                else { url =  annotationApi.nameApi() ; }
-                                                Mapping mapping = new Mapping( trueClassName, method.getName() )  ;
-                                                //Ajout des information dans le Hashmap 
-                                                if(HashmapUtility.containsKey(url))
-                                                { throw new DuplicateKeyException("Error Annotation duplicated : " + url + "\n"); }
-                                                HashmapUtility.put( url , mapping ) ;
-                                            }
+                                    this.scan_url(trueClassName , myclass , hashmapUtility ) ; 
                                 }
                         } 
                     }
@@ -165,6 +164,46 @@ public class Utility {
         { e.printStackTrace(); } 
     }
 
+    public void scan_url( String classeName , Class<?> myClass , HashMap hashmapUtility  ) throws Exception { 
+        Method [] methods = myClass.getDeclaredMethods() ;
+        //Liste de Methode pour chaque Classe 
+        String url = "" ; 
+        HashSet<VerbeMethod> ls_verbeMethods = new HashSet<VerbeMethod>() ;
+        for (Method method : methods) {
+                Url annotationUrl = method.getAnnotation(Url.class);
+               if ( annotationUrl != null) {
+                    url = annotationUrl.nameUrl();
+                    if (hashmapUtility.containsKey(url)) { 
+                        String verbe = this.checkVerbe( method);
+                        VerbeMethod verbeMethod = new VerbeMethod(verbe, method.getName());
+                        if ( this.checkVerbeDuplicate(ls_verbeMethods, verbeMethod)) {
+                            throw new Exception("Erreur : 2 URL :'" + url + "' avec 2 verbe :'" + verbe + "' identique");
+                        }
+                        else {
+                            ls_verbeMethods.add(verbeMethod);
+                            hashmapUtility.put(url, new Mapping( classeName , ls_verbeMethods) ) ;
+                        }  
+                    }
+                    String verbe = this.checkVerbe( method);
+                    if(  ls_verbeMethods.add(new VerbeMethod(verbe, method.getName())) == false ) { 
+                        throw new Exception("Erreur 2 verbe et 2 methodName identique"); 
+                    }else {
+                        ls_verbeMethods.add(new VerbeMethod(verbe, method.getName()));
+                        hashmapUtility.put(url, new Mapping( classeName , ls_verbeMethods) ) ; } 
+                }
+        }   
+}    
+
+public boolean checkVerbeDuplicate(HashSet<VerbeMethod> ls_verbeMethods, VerbeMethod vm) {
+    if (ls_verbeMethods.stream().anyMatch(v -> v.getVerb().equals(vm.getVerb()))) {
+        return true; 
+    } else {
+        return false;
+    }
+}
+    
+
+  
     public boolean CheckAnnotationRestApi (Method myMethod ,  String normalizedPath , String packageName  ){ 
         try {
             
