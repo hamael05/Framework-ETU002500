@@ -1,4 +1,4 @@
-package annotation ;
+package annotation;
 import java.lang.annotation.*;
 
 @Retention(RetentionPolicy.RUNTIME)
