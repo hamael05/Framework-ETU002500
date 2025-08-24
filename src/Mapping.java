@@ -1,24 +1,28 @@
 package mapping ; 
 
+import vm.VerbeMethod ; 
+import java.util.HashSet;
+
 public class Mapping {
 
     String ClasseName ; 
-    String MethodeName ; 
+    HashSet<VerbeMethod> verbeMethods ; 
 
-    public Mapping(String ClasseName, String MethodeName) { 
-        this.setClasseName(ClasseName);
-        this.setMethodeName(MethodeName);
-    } 
+    public Mapping(String ClassName, HashSet<VerbeMethod> verbeMethods ) 
+    {  
+        this.setClasseName(ClassName);
+        this.setVerbeMethods(verbeMethods);
+    }
     public String getClasseName() {
         return ClasseName;
     }
-    public String getMethodeName() {
-        return MethodeName;
+    public HashSet<VerbeMethod> getVerbeMethods() {
+        return verbeMethods;
     }
     public void setClasseName(String classeName) {
         ClasseName = classeName;
     }
-    public void setMethodeName(String methodeName) {
-        MethodeName = methodeName;
+    public void setVerbeMethods(HashSet<VerbeMethod> verbeMethods) {
+        this.verbeMethods = verbeMethods;
     }
 }

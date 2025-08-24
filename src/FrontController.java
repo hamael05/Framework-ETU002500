@@ -13,7 +13,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import utility.Utility ; 
+import utility.Utility ;
+import vm.VerbeMethod;
 import modelview.ModelView ; 
 import exception.* ;
 import java.lang.annotation.Annotation;
@@ -154,12 +155,12 @@ public class FrontController extends HttpServlet {
             else { throw new TypeErrorException(" Error Type of return incorrect methode "); }   
         }    
     } 
-    public void ShowResult(Mapping value  , PrintWriter out  , HttpServletRequest request  ,  HttpServletResponse response  )throws TypeErrorException ,Exception
+    public void ShowResult(Mapping value  , String methodName , PrintWriter out  , HttpServletRequest request  ,  HttpServletResponse response  )throws TypeErrorException ,Exception
     {
         try { 
                // out.print("Classe Name : " + value.getClasseName() + " , " + "Methode Name : " + value.getMethodeName() + "\n");
                 Class myClass = Class.forName(value.getClasseName());
-                Method myMethod = this.util.checkMethod(myClass, value.getMethodeName()  ) ;  
+                Method myMethod = this.util.checkMethod(myClass, methodName  ) ;  
                 ArrayList<Object> valueArg = this.util.verifyCorrespondence( request , myMethod  , out ) ;
                 this.util.verifyCorrespondenceFieldSession(myClass , request ) ;
                 Object myObject = myClass.getDeclaredConstructor(new Class[0]).newInstance(new Object[0]) ; 
@@ -180,12 +181,23 @@ public class FrontController extends HttpServlet {
             StringBuffer url = request.getRequestURL();
             String urlString = url.toString();
             String transformed = this.util.transformPath2(urlString) ;   
-            Mapping mapping = hashmapUtility.get(transformed);  
+            Mapping mapping = hashmapUtility.get(transformed);   
             if(mapping == null) {
-                throw new Exception("404 error , url incorrect");
+                //throw new Exception("404 error , url incorrect");
+                out.print("404 error , url incorrect") ; 
             }
             else
-            { this.ShowResult(mapping  , out , request , response ); }
+            {  
+                HashSet<VerbeMethod> ls_verbeMethod = mapping.getVerbeMethods() ; 
+                for ( VerbeMethod method : ls_verbeMethod) { 
+                    if ( method.getVerb().equals( request.getMethod() )) { 
+                        this.ShowResult(mapping , method.getMethod()  ,  out , request , response ); 
+                    }else { //throw new Exception("500 error , conflict method form ")
+                     out.print("500 error , conflict method form");
+                    }
+                }
+            }
+                    
 
         }catch( Exception e ) 
         {
