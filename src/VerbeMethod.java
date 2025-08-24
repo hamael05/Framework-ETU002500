@@ -37,5 +37,4 @@ public class VerbeMethod {
     public int hashCode() {
         return Objects.hash( verb , method );
     }
-
 }

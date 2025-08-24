@@ -22,16 +22,28 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletResponse; 
 import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.* ;
+import java.math.BigDecimal;
+
+
 import session.MySession;
+import validation.Validation;
 import vm.VerbeMethod; 
 import jakarta.servlet.http.Part;
 import jakarta.servlet.annotation.MultipartConfig;
 
 @MultipartConfig
 public class Utility {
+
+    HashMap<String, ValueAndError> mapValidation = new HashMap<String , ValueAndError>(); 
     public Utility()
     {
 
+    }
+    public HashMap<String, ValueAndError> getMapValidation() {
+        return this.mapValidation;
+    }
+    public void setMapValidation(HashMap<String, ValueAndError> mapValidation) {
+        this.mapValidation = mapValidation;
     }
     //L'instabiliter de tomcat modifie le path c'est la raison de cette fonction 
     public String normalizePath(String path) {
@@ -143,6 +155,7 @@ public class Utility {
         }
         return "GET" ; // annotation get default  
     }
+
     //Scan url 
     public void AddMethodeAnnotation( String normalizedPath , String packageName  , HashMap hashmapUtility) throws Exception 
     {  
@@ -198,6 +211,7 @@ public class Utility {
         if (ls_verbeMethods.stream().anyMatch(v -> v.getVerb().equals(vm.getVerb()))) { return true; } 
         else { return false ; }
     }
+
     public boolean CheckAnnotationRestApi (Method myMethod ,  String normalizedPath , String packageName  ){ 
         try {
             
@@ -212,7 +226,7 @@ public class Utility {
                     Class<?> myclass = Thread.currentThread().getContextClassLoader().loadClass(trueClassName) ; 
                     Method [] methods = myclass.getDeclaredMethods() ;
                         for (Method method : methods)
-                            if(method.isAnnotationPresent(AnnotationRestapi .class) && myMethod.getName().equals(method.getName()))  
+                            if(method.isAnnotationPresent(AnnotationRestapi.class) && myMethod.getName().equals(method.getName()))  
                             { return true ; }  
                     } 
             } 
@@ -250,6 +264,7 @@ public class Utility {
             }
         }catch( Exception e ) { e.printStackTrace() ; }
     }
+
     public void saveFile( Part partFile , HttpServletResponse response) { 
         try { 
         String fileName = getFileName( partFile );
@@ -261,6 +276,7 @@ public class Utility {
             e.printStackTrace() ; 
         } 
     }
+
     public String getFileName(Part part) {
         try{ 
         String contentDisposition = part.getHeader("content-disposition");
@@ -271,8 +287,8 @@ public class Utility {
         }
         }catch ( Exception e ) { e.printStackTrace() ; }
         return null;
-        
     }
+
     public void verifyCorrespondenceNotAnnotation( Annotation paramAnnotations , Class<?> paramType ,  ArrayList<Object> valueArg , HttpServletRequest request ,  String paramName  ) throws Exception 
     {
         try { 
@@ -304,7 +320,7 @@ public class Utility {
          }catch( Exception e )
          { e.printStackTrace(); }
     } 
-    public ArrayList<Object> verifyCorrespondence( HttpServletRequest request  , HttpServletResponse response , Method myMethod   , PrintWriter out ) throws Exception
+    public ArrayList<Object> verifyCorrespondence( HttpServletRequest request  , HttpServletResponse response , Method myMethod ) throws Exception
     {
         try{ 
             ArrayList<Object> valueArg = new ArrayList<>() ; 
@@ -399,11 +415,87 @@ public class Utility {
         //  System.err.println("Error invoking method: " + e.getMessage());
         }
     }
-    public void SetAttributeObject(Method myMethod, ArrayList<Object> valueArg, String[] partiesInput, HttpServletRequest request , PrintWriter out ) throws Exception{ 
-        try {
 
+    public void managerValidation(Method myMethod, String nameInput, HttpServletRequest request, Field field , String partieInput ) throws Exception {
+        boolean checkValidation = true;
+        try {
+            Validation validation = new Validation();
+            AnnotationField fieldAnnotation = field.getAnnotation(AnnotationField.class);
+        if( validation.checkAnnotationField(field) == 1) {  
+            if( fieldAnnotation.name().equals( partieInput ) ) {
+                if (validation.checkAnnotationDecimal(field) == 1) {
+                    AnnotationDecimal fieldAnnotations = field.getAnnotation(AnnotationDecimal.class);
+                    if (validation.isNumeric(request.getParameter(nameInput))) {           
+                        validation.validateValue(
+                                Double.valueOf(request.getParameter(nameInput)),
+                                Double.valueOf(fieldAnnotations.min()),
+                                Double.valueOf(fieldAnnotations.max())
+                        );
+                    }
+                }
+                // Validation Size
+                if (validation.checkAnnotationSize(field) == 1) {
+                    AnnotationSize fieldAnnotationsSize = field.getAnnotation(AnnotationSize.class);
+                    if( validation.isNumeric(request.getParameter(nameInput) ) == false )  {
+                        validation.validateSizeString(
+                                request.getParameter(nameInput),
+                                Integer.valueOf(fieldAnnotationsSize.min()),
+                                Integer.valueOf(fieldAnnotationsSize.max())
+                        )  ; 
+                    } 
+                }
+                // Validation NotNull
+                if (validation.checkAnnotationNotNull(field) == 1) {   
+                    AnnotationNotNull fieldAnnotationsNotNull = field.getAnnotation(AnnotationNotNull.class);
+                    validation.validateValuesNull(request.getParameter(nameInput));
+                }
+             } else { 
+                checkValidation = false ; 
+             }
+        } else { 
+            checkValidation = false ; 
+        }
+
+        } catch (Exception e) {
+            checkValidation = false;
+            this.getMapValidation().put(
+                    nameInput + "_error",
+                    new ValueAndError(request.getParameter(nameInput), e.getMessage())
+            );
+            this.setMapValidation( this.getMapValidation() );
+            System.out.println("map added \n");
+        }
+        if (checkValidation && this.getMapValidation().containsKey(nameInput + "_error")) {
+            this.getMapValidation().remove(nameInput + "_error");
+
+        }
+    }
+    
+
+    public static Map<String, String> renameDuplicateKey(Map<String, String> map) {
+        Map<String, String> mapResultat = new HashMap<>();
+        Map<String, Integer> compteurCles = new HashMap<>();
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            String cle = entry.getKey();
+            String valeur = entry.getValue();
+            if (compteurCles.containsKey(cle)) {
+                int suffixe = compteurCles.get(cle) + 1;
+                compteurCles.put(cle, suffixe);
+                cle = cle + suffixe; 
+            } else {
+                compteurCles.put(cle, 1);
+            }
+            mapResultat.put(cle, valeur);
+        }
+        return mapResultat;
+    }
+
+    ///Set attribute Object
+    public void SetAttributeObject(Method myMethod, ArrayList<Object> valueArg, String[] partiesInput, HttpServletRequest request , String nameInput ) throws Exception{ 
+        try {
+            int count = 0 ; 
             Parameter[] parameters = myMethod.getParameters();
-            int count = 0; 
+         
             for (Parameter parameter : parameters) {
                 Annotation paramAnnotations = parameter.getAnnotation(AnnotationParam.class);  
                 if (paramAnnotations != null) {
@@ -413,16 +505,19 @@ public class Utility {
                         if (this.identifyType( paramType.getSimpleName() )  == false) { // Si c'est un Object 
                             Object objClass = valueArg.get(count); 
                             Field[] fields = paramType.getDeclaredFields(); 
-                            for (Field field : fields) { 
+                            for (Field field : fields) {   
+
+                                this.managerValidation(myMethod, nameInput, request, field , partiesInput[1]);
+
                                 Annotation fieldAnnotations = field.getAnnotation(AnnotationField.class);  
                                 if (fieldAnnotations != null) {
                                     AnnotationField annotationField = (AnnotationField) fieldAnnotations;         
                                     if (annotationField.name().equals(partiesInput[1])) { // Annotation Field
+
                                         field.setAccessible(true); // Accès champ privé
                                         Method setMethod = paramType.getDeclaredMethod("set" + this.covertMinMaj(field.getName()), field.getType() );  
                                         setMethod.setAccessible(true);     
                                         this.SetAttributeObject2( setMethod , field.getType().getSimpleName()  , objClass ,  partiesInput ,  request )  ;
-                                        //throw new Exception("Count value :"  + count +  "ObjEmp : " + valueArg.get(count) +  " Set Succes2  "  + "set" + this.covertMinMaj(field.getName())   + " fieldType : "  + field.getType()  +  "\n") ;    
                                     } 
                                 }
                               
@@ -436,6 +531,38 @@ public class Utility {
             e.printStackTrace(); 
         }
     }  
+
+    public boolean CheckAnnotationMethod ( Method myMethod ,  String normalizedPath , String packageName  , String pathValidation ){ 
+        try {
+            
+            File classpathDirectory = new File(normalizedPath) ; 
+            for ( File file : classpathDirectory.listFiles() )   
+            {
+                if(file.isFile() && file.getName().endsWith(".class"))
+                {   
+                    String className = file.getName().substring( 0 , file.getName().length() - 6 ) ; 
+                    String trueClassName = this.fusionPackageAndClassName(className , packageName); 
+                    //Transformation en classe
+                    Class<?> myclass = Thread.currentThread().getContextClassLoader().loadClass(trueClassName) ; 
+                    Method [] methods = myclass.getDeclaredMethods() ;
+                        for (Method method : methods)
+                            if(method.isAnnotationPresent(Url.class)   )  
+                            { 
+                                Url methodAnnotation = method.getAnnotation(Url.class);  
+                                if( methodAnnotation.nameUrl().equals(  pathValidation ) )  { 
+                                    System.out.println( "method Annoter :" +  methodAnnotation.nameUrl() + "\n" ) ;
+                                    System.out.println( "path validation :" + pathValidation  + "\n" ) ; 
+                                return true ; } 
+                            }  
+                    } 
+            } 
+            return false ;    
+        } catch (Exception e) {
+          e.printStackTrace(); 
+          System.out.println(e);
+        }
+        return false ; 
+    }
 
 }
 

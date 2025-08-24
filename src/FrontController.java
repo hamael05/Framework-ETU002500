@@ -11,9 +11,11 @@ import jakarta.servlet.* ;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletResponse; 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import java.net.URLDecoder;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import utility.Utility ;
+import utility.*;
 import vm.VerbeMethod;
 import modelview.ModelView ; 
 import exception.* ;
@@ -21,6 +23,9 @@ import java.lang.annotation.Annotation;
 import com.google.gson.Gson;
 import jakarta.servlet.http.Part;
 import jakarta.servlet.annotation.MultipartConfig;
+import jakarta.servlet.http.HttpSession; 
+import session.* ; 
+import modelview.ModelView;
 
 @MultipartConfig
 public class FrontController extends HttpServlet {
@@ -80,23 +85,29 @@ public class FrontController extends HttpServlet {
         { e.printStackTrace(); }   
     } 
 
-    public void dispacthModelView( ModelView mv , HttpServletRequest request  ,  HttpServletResponse response )
+    public void dispacthModelView(  ModelView mv , HttpServletRequest request  ,  HttpServletResponse response )
     {
         try{
+            HashMap<String, ValueAndError> mapValidation = this.util.getMapValidation() ; 
+            String url = mv.getUrl() ;
+            System.out.println("Actu url : " + url + "\n") ; 
             Set<String> keyMap= mv.getData().keySet(); 
+            String httpMethod = request.getMethod(); 
             for(String keymap : keyMap)
-            {
-                request.setAttribute( keymap , mv.getData().get(keymap)) ; 
-            }
-            RequestDispatcher dispatch = request.getRequestDispatcher( mv.getUrl());
-            dispatch.forward(request, response);
+            { request.setAttribute( keymap , mv.getData().get(keymap)) ; }
+
+           
+                RequestDispatcher dispatch = request.getRequestDispatcher( url ); 
+                dispatch.forward(request, response);
+            
+      
         }catch(Exception e )
         { 
             System.out.println(e);
+            e.printStackTrace(); 
         }
     }
- 
-    public void setObjectParam ( Method myMethod  , ArrayList<Object> valueArg  ,HttpServletRequest request  , PrintWriter out ) throws  Exception
+    public void setObjectParam ( Method myMethod  , ArrayList<Object> valueArg  ,HttpServletRequest request   ) throws  Exception
     {
          try{ 
                 Enumeration<String> parameterNames = request.getParameterNames() ;   
@@ -105,16 +116,12 @@ public class FrontController extends HttpServlet {
                     String paramName = parameterNames.nextElement();
                     String[] partiesInput = paramName.split("\\.");
                     if( partiesInput.length > 1 ) 
-                    { 
-                        this.util.SetAttributeObject( myMethod , valueArg, partiesInput , request , out); 
-                        throw new Exception("SetAttribut Active \n") ;
-                    }
+                    {   this.util.SetAttributeObject( myMethod , valueArg, partiesInput , request , paramName);  }
                 }       
 
          }catch(Exception e)
          { e.printStackTrace(); } 
     } 
-    
 
     public boolean verifyAnnotaionrRestApi( Method mymethod ) throws Exception  { 
         try {
@@ -131,8 +138,24 @@ public class FrontController extends HttpServlet {
         }
         return false ; 
     }
-    
-    public void ShowResultJson( boolean boolRestapi , Object res , PrintWriter out ,  HttpServletRequest request  ,  HttpServletResponse response  ) throws TypeErrorException 
+
+    public boolean verifyUrlMethod( Method myMethod , String pathValidation ) throws Exception  { 
+        try {
+            ServletContext context = getServletContext() ; 
+            if( context.getResource(this.util.PathWithoutPackageName(this.Source)).getPath() != null){
+                String classpath = context.getResource(this.util.PathWithoutPackageName(this.Source)).getPath() ; 
+                String normalizedPath = this.util.normalizePath(classpath);   
+                String packageName = this.util.transformPath(this.Source) ;  
+                boolean result = this.util.CheckAnnotationMethod(myMethod, normalizedPath, packageName , pathValidation  ) ;
+                return result ; 
+            }else {  throw new Exception("Error package Scan verify our file xml in verifyAnnRestApi \n") ;  } 
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+        return false ; 
+    }
+
+    public void ShowResultJson( boolean boolRestapi , Object res , PrintWriter out ,  HttpServletRequest request  ,  HttpServletResponse response    ) throws TypeErrorException 
     {
             response.setContentType("application/json");
             Gson gson = new Gson();
@@ -147,7 +170,7 @@ public class FrontController extends HttpServlet {
                     out.print("Url json  :" + jsonUrl + "\n") ; 
                     out.write("Data json write  :" + jsonData  + "\n") ; 
                 } else { 
-                    this.dispacthModelView( (ModelView)res , request , response); 
+                    this.dispacthModelView( (ModelView)res , request , response ); 
                 }
             }else if( res instanceof String){ 
                 if( boolRestapi ){
@@ -155,23 +178,71 @@ public class FrontController extends HttpServlet {
                     out.print( "Data not mv : " + res  + '\n'  ) ; 
                 }else{ out.print("Valeur de la methode String :" + res + "\n") ;  }
             }else { throw new TypeErrorException(" Error Type of return incorrect methode "); }
-
     }
-    public void ShowResult(Mapping value  , String methodName , PrintWriter out  , HttpServletRequest request  ,  HttpServletResponse response  )throws TypeErrorException ,Exception
+    
+    public boolean setErrorValidation (  HttpServletRequest request  ,  HttpServletResponse response  , ArrayList<Object> valueArg,  Object myObject  , Method myMethod ) { 
+        try{    
+            String referer = request.getHeader("Referer");
+            HashMap<String, ValueAndError> mapValidation = this.util.getMapValidation() ; 
+            if( referer != null && mapValidation.size() > 0) { 
+                String packageProjectName =  referer.substring(referer.indexOf("/", referer.indexOf("//") + 2), referer.lastIndexOf("/"));
+                String pathValidation = referer.substring(referer.lastIndexOf("/"));  
+                if( verifyUrlMethod( myMethod , pathValidation ) ) { 
+                    for (Map.Entry<String, ValueAndError > entry : mapValidation.entrySet()) {
+                        String key = entry.getKey();
+                        ValueAndError value =  entry.getValue();           
+                        request.setAttribute(key ,  value.getError() + "<script> window.history.pushState({}, \"\", \""+ packageProjectName + pathValidation +"\"); console.log(\"referer not move\")</script>") ; 
+                        request.setAttribute( key+"_init" , value.getValue()  ) ; 
+                      
+                    }      
+                    return true ; 
+                }
+            }
+            return false ; 
+        }catch(Exception e){ 
+            System.out.println("e") ;
+            e.printStackTrace(); 
+        }
+        return false ; 
+    }
+    
+    public void ShowResult(Mapping mapping  , String methodName , PrintWriter out  , HttpServletRequest request  ,  HttpServletResponse response  )throws TypeErrorException ,Exception
     {
         try { 
-                Class myClass = Class.forName(value.getClasseName());
+                Class myClass = Class.forName(mapping.getClasseName());
                 Method myMethod = this.util.checkMethod(myClass, methodName ) ;  
-                ArrayList<Object> valueArg = this.util.verifyCorrespondence( request , response , myMethod  , out ) ;
+                ArrayList<Object> valueArg = this.util.verifyCorrespondence( request , response , myMethod  ) ;
                 this.util.verifyCorrespondenceFieldSession(myClass , request ) ;
                 Object myObject = myClass.getDeclaredConstructor(new Class[0]).newInstance(new Object[0]) ; 
-                Object res = this.util.invokingMethod( valueArg , myObject , myMethod ) ; 
                 boolean boolRestapi = this.verifyAnnotaionrRestApi( myMethod ) ; 
-                this.setObjectParam(myMethod, valueArg, request , out); 
-                this.ShowResultJson(boolRestapi, res , out , request , response  );
+                this.setObjectParam(myMethod, valueArg, request ); 
+                Object res = null ; 
+                    if( this.setErrorValidation( request, response, valueArg, myObject, myMethod )  ) { 
+                        String referer = request.getHeader("Referer");
+                        String pathValidation = "/" + referer.substring(referer.lastIndexOf("/") + 1); 
+
+                        Mapping mapping1 = this.hashmapUtility.get( pathValidation ); 
+                        HashSet<VerbeMethod> ls_verbeMethod = mapping1.getVerbeMethods() ;  
+
+                        for ( VerbeMethod method : ls_verbeMethod) {  
+                            Class myClass1 = Class.forName(mapping1.getClasseName());
+                            Method myMethod1 = this.util.checkMethod(myClass1 , method.getMethod() ) ;  
+                            ArrayList<Object> valueArg1 = this.util.verifyCorrespondence( request , response , myMethod1  ) ;
+                            this.util.verifyCorrespondenceFieldSession(myClass1 , request ) ;
+                            Object myObject1 = myClass1.getDeclaredConstructor(new Class[0]).newInstance(new Object[0]) ; 
+                            //this.setObjectParam(myMethod1, valueArg1, request );
+                            res = this.util.invokingMethod( valueArg1 , myObject1 , myMethod1 ) ;  
+                        } 
+                        
+                    } else { 
+                        res = this.util.invokingMethod( valueArg , myObject , myMethod ) ; 
+                    }
+                this.ShowResultJson( boolRestapi, res , out , request , response );
+                
         }catch(Exception e )
         {  e.printStackTrace();  }
     }
+
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)throws TypeErrorException ,Exception  , IllegalArgumentException
     {  
         PrintWriter out = response.getWriter() ; 
@@ -185,6 +256,7 @@ public class FrontController extends HttpServlet {
             else {     
                         HashSet<VerbeMethod> ls_verbeMethod = mapping.getVerbeMethods() ;  
                         for ( VerbeMethod method : ls_verbeMethod) { 
+                            System.out.println("methode dans le mappin : " + method.getMethod() + " \n") ;  //TODO : Check if the method is allowed in this context (e.g., authenticated, authorized, etc.)
                             if ( method.getVerb().equals( request.getMethod() )) { 
                                 this.ShowResult(mapping , method.getMethod()  ,  out , request , response ); 
                             }else {   out.print("error 500\n") ;  }          
