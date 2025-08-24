@@ -105,16 +105,12 @@ public class FrontController extends HttpServlet {
                     String paramName = parameterNames.nextElement();
                     String[] partiesInput = paramName.split("\\.");
                     if( partiesInput.length > 1 ) 
-                    { 
-                        this.util.SetAttributeObject( myMethod , valueArg, partiesInput , request , out); 
-                        throw new Exception("SetAttribut Active \n") ;
-                    }
+                    {   this.util.SetAttributeObject( myMethod , valueArg, partiesInput , request , paramName, out); }
                 }       
 
          }catch(Exception e)
          { e.printStackTrace(); } 
     } 
-    
 
     public boolean verifyAnnotaionrRestApi( Method mymethod ) throws Exception  { 
         try {
@@ -155,8 +151,8 @@ public class FrontController extends HttpServlet {
                     out.print( "Data not mv : " + res  + '\n'  ) ; 
                 }else{ out.print("Valeur de la methode String :" + res + "\n") ;  }
             }else { throw new TypeErrorException(" Error Type of return incorrect methode "); }
-
     }
+    
     public void ShowResult(Mapping value  , String methodName , PrintWriter out  , HttpServletRequest request  ,  HttpServletResponse response  )throws TypeErrorException ,Exception
     {
         try { 
@@ -172,6 +168,7 @@ public class FrontController extends HttpServlet {
         }catch(Exception e )
         {  e.printStackTrace();  }
     }
+
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)throws TypeErrorException ,Exception  , IllegalArgumentException
     {  
         PrintWriter out = response.getWriter() ; 

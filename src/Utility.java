@@ -22,7 +22,10 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletResponse; 
 import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.* ;
+import java.math.BigDecimal;
+
 import session.MySession;
+import validation.Validation;
 import vm.VerbeMethod; 
 import jakarta.servlet.http.Part;
 import jakarta.servlet.annotation.MultipartConfig;
@@ -143,6 +146,7 @@ public class Utility {
         }
         return "GET" ; // annotation get default  
     }
+
     //Scan url 
     public void AddMethodeAnnotation( String normalizedPath , String packageName  , HashMap hashmapUtility) throws Exception 
     {  
@@ -198,6 +202,7 @@ public class Utility {
         if (ls_verbeMethods.stream().anyMatch(v -> v.getVerb().equals(vm.getVerb()))) { return true; } 
         else { return false ; }
     }
+
     public boolean CheckAnnotationRestApi (Method myMethod ,  String normalizedPath , String packageName  ){ 
         try {
             
@@ -212,7 +217,7 @@ public class Utility {
                     Class<?> myclass = Thread.currentThread().getContextClassLoader().loadClass(trueClassName) ; 
                     Method [] methods = myclass.getDeclaredMethods() ;
                         for (Method method : methods)
-                            if(method.isAnnotationPresent(AnnotationRestapi .class) && myMethod.getName().equals(method.getName()))  
+                            if(method.isAnnotationPresent(AnnotationRestapi.class) && myMethod.getName().equals(method.getName()))  
                             { return true ; }  
                     } 
             } 
@@ -250,6 +255,7 @@ public class Utility {
             }
         }catch( Exception e ) { e.printStackTrace() ; }
     }
+
     public void saveFile( Part partFile , HttpServletResponse response) { 
         try { 
         String fileName = getFileName( partFile );
@@ -261,6 +267,7 @@ public class Utility {
             e.printStackTrace() ; 
         } 
     }
+
     public String getFileName(Part part) {
         try{ 
         String contentDisposition = part.getHeader("content-disposition");
@@ -271,8 +278,8 @@ public class Utility {
         }
         }catch ( Exception e ) { e.printStackTrace() ; }
         return null;
-        
     }
+
     public void verifyCorrespondenceNotAnnotation( Annotation paramAnnotations , Class<?> paramType ,  ArrayList<Object> valueArg , HttpServletRequest request ,  String paramName  ) throws Exception 
     {
         try { 
@@ -399,7 +406,29 @@ public class Utility {
         //  System.err.println("Error invoking method: " + e.getMessage());
         }
     }
-    public void SetAttributeObject(Method myMethod, ArrayList<Object> valueArg, String[] partiesInput, HttpServletRequest request , PrintWriter out ) throws Exception{ 
+
+
+    //Validation 
+    public int checkAnnotationDecimal( Field field ) { 
+        if( field.isAnnotationPresent(AnnotationDecimal.class) )
+        {  return 1 ; } 
+        else { return 0 ; } 
+    }
+
+    public void CheckValidation (Method myMethod ,  String nameInput , HttpServletRequest request , Field field) throws Exception{ 
+        try {
+                AnnotationDecimal  fieldAnnotations = field.getAnnotation(AnnotationDecimal.class);  
+                Validation validation = new Validation() ;  
+                validation.validateValue( Double.valueOf(request.getParameter( nameInput )) , Double.valueOf( fieldAnnotations.min())  , Double.valueOf(fieldAnnotations.max()) ) ;  
+        } catch (Exception e) {
+            e.printStackTrace(); 
+        }
+    }  
+    public void manageValidation (Method myMethod , String nameInput , HttpServletRequest request , Field field) throws Exception{  
+        if( checkAnnotationDecimal(field) == 1 ) {  this.CheckValidation(myMethod, nameInput, request, field) ; } 
+    }
+    ///Set attribute Object
+    public void SetAttributeObject(Method myMethod, ArrayList<Object> valueArg, String[] partiesInput, HttpServletRequest request , String nameInput , PrintWriter out ) throws Exception{ 
         try {
 
             Parameter[] parameters = myMethod.getParameters();
@@ -414,10 +443,12 @@ public class Utility {
                             Object objClass = valueArg.get(count); 
                             Field[] fields = paramType.getDeclaredFields(); 
                             for (Field field : fields) { 
+                                this.manageValidation(myMethod, nameInput, request, field);
                                 Annotation fieldAnnotations = field.getAnnotation(AnnotationField.class);  
                                 if (fieldAnnotations != null) {
                                     AnnotationField annotationField = (AnnotationField) fieldAnnotations;         
                                     if (annotationField.name().equals(partiesInput[1])) { // Annotation Field
+
                                         field.setAccessible(true); // Accès champ privé
                                         Method setMethod = paramType.getDeclaredMethod("set" + this.covertMinMaj(field.getName()), field.getType() );  
                                         setMethod.setAccessible(true);     
