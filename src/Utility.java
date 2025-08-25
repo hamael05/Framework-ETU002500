@@ -1,9 +1,12 @@
 package utility ; 
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.PrintWriter;
 import java.lang.annotation.*;
 import java.net.URLDecoder;
+import java.net.http.HttpRequest;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -11,18 +14,21 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import exception.* ; 
 import mapping.Mapping;
 import modelview.ModelView;
-import annotation.* ; 
+import annotation.* ;
+import authentification.AuthLevel;
 import jakarta.servlet.* ; 
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletResponse; 
 import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.* ;
 import java.math.BigDecimal;
+
 
 import session.MySession;
 import validation.Validation;
@@ -32,9 +38,17 @@ import jakarta.servlet.annotation.MultipartConfig;
 
 @MultipartConfig
 public class Utility {
+
+    HashMap<String, ValueAndError> mapValidation = new HashMap<String , ValueAndError>(); 
     public Utility()
     {
 
+    }
+    public HashMap<String, ValueAndError> getMapValidation() {
+        return this.mapValidation;
+    }
+    public void setMapValidation(HashMap<String, ValueAndError> mapValidation) {
+        this.mapValidation = mapValidation;
     }
     //L'instabiliter de tomcat modifie le path c'est la raison de cette fonction 
     public String normalizePath(String path) {
@@ -311,7 +325,7 @@ public class Utility {
          }catch( Exception e )
          { e.printStackTrace(); }
     } 
-    public ArrayList<Object> verifyCorrespondence( HttpServletRequest request  , HttpServletResponse response , Method myMethod   , PrintWriter out ) throws Exception
+    public ArrayList<Object> verifyCorrespondence( HttpServletRequest request  , HttpServletResponse response , Method myMethod ) throws Exception
     {
         try{ 
             ArrayList<Object> valueArg = new ArrayList<>() ; 
@@ -372,7 +386,6 @@ public class Utility {
         } return null ; 
     }
     
- 
   public void SetAttributeObject2(Method setMethod, String typefield, Object objClass, String[] partiesInput, HttpServletRequest request) throws Exception {
         String parameterName = partiesInput[0] + "." + partiesInput[1];
         String parameterValue = request.getParameter(parameterName);
@@ -407,32 +420,86 @@ public class Utility {
         }
     }
 
-
-    //Validation 
-    public int checkAnnotationDecimal( Field field ) { 
-        if( field.isAnnotationPresent(AnnotationDecimal.class) )
-        {  return 1 ; } 
-        else { return 0 ; } 
-    }
-
-    public void CheckValidation (Method myMethod ,  String nameInput , HttpServletRequest request , Field field) throws Exception{ 
+    public void managerValidation(Method myMethod, String nameInput, HttpServletRequest request, Field field , String partieInput ) throws Exception {
+        boolean checkValidation = true;
         try {
-                AnnotationDecimal  fieldAnnotations = field.getAnnotation(AnnotationDecimal.class);  
-                Validation validation = new Validation() ;  
-                validation.validateValue( Double.valueOf(request.getParameter( nameInput )) , Double.valueOf( fieldAnnotations.min())  , Double.valueOf(fieldAnnotations.max()) ) ;  
-        } catch (Exception e) {
-            e.printStackTrace(); 
+            Validation validation = new Validation();
+            AnnotationField fieldAnnotation = field.getAnnotation(AnnotationField.class);
+        if( validation.checkAnnotationField(field) == 1) {  
+            if( fieldAnnotation.name().equals( partieInput ) ) {
+                if (validation.checkAnnotationDecimal(field) == 1) {
+                    AnnotationDecimal fieldAnnotations = field.getAnnotation(AnnotationDecimal.class);
+                    if (validation.isNumeric(request.getParameter(nameInput))) {           
+                        validation.validateValue(
+                                Double.valueOf(request.getParameter(nameInput)),
+                                Double.valueOf(fieldAnnotations.min()),
+                                Double.valueOf(fieldAnnotations.max())
+                        );
+                    }
+                }
+                // Validation Size
+                if (validation.checkAnnotationSize(field) == 1) {
+                    AnnotationSize fieldAnnotationsSize = field.getAnnotation(AnnotationSize.class);
+                    if( validation.isNumeric(request.getParameter(nameInput) ) == false )  {
+                        validation.validateSizeString(
+                                request.getParameter(nameInput),
+                                Integer.valueOf(fieldAnnotationsSize.min()),
+                                Integer.valueOf(fieldAnnotationsSize.max())
+                        )  ; 
+                    } 
+                }
+                // Validation NotNull
+                if (validation.checkAnnotationNotNull(field) == 1) {   
+                    AnnotationNotNull fieldAnnotationsNotNull = field.getAnnotation(AnnotationNotNull.class);
+                    validation.validateValuesNull(request.getParameter(nameInput));
+                }
+             } else { 
+                checkValidation = false ; 
+             }
+        } else { 
+            checkValidation = false ; 
         }
-    }  
-    public void manageValidation (Method myMethod , String nameInput , HttpServletRequest request , Field field) throws Exception{  
-        if( checkAnnotationDecimal(field) == 1 ) {  this.CheckValidation(myMethod, nameInput, request, field) ; } 
-    }
-    ///Set attribute Object
-    public void SetAttributeObject(Method myMethod, ArrayList<Object> valueArg, String[] partiesInput, HttpServletRequest request , String nameInput , PrintWriter out ) throws Exception{ 
-        try {
 
+        } catch (Exception e) {
+            checkValidation = false;
+            this.getMapValidation().put(
+                    nameInput + "_error",
+                    new ValueAndError(request.getParameter(nameInput), e.getMessage())
+            );
+            this.setMapValidation( this.getMapValidation() );
+            System.out.println("map added \n");
+        }
+        if (checkValidation && this.getMapValidation().containsKey(nameInput + "_error")) {
+            this.getMapValidation().remove(nameInput + "_error");
+
+        }
+    }
+    
+
+    public static Map<String, String> renameDuplicateKey(Map<String, String> map) {
+        Map<String, String> mapResultat = new HashMap<>();
+        Map<String, Integer> compteurCles = new HashMap<>();
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            String cle = entry.getKey();
+            String valeur = entry.getValue();
+            if (compteurCles.containsKey(cle)) {
+                int suffixe = compteurCles.get(cle) + 1;
+                compteurCles.put(cle, suffixe);
+                cle = cle + suffixe; 
+            } else {
+                compteurCles.put(cle, 1);
+            }
+            mapResultat.put(cle, valeur);
+        }
+        return mapResultat;
+    }
+
+    ///Set attribute Object
+    public void SetAttributeObject(Method myMethod, ArrayList<Object> valueArg, String[] partiesInput, HttpServletRequest request , String nameInput ) throws Exception{ 
+        try {
+            int count = 0 ; 
             Parameter[] parameters = myMethod.getParameters();
-            int count = 0; 
+         
             for (Parameter parameter : parameters) {
                 Annotation paramAnnotations = parameter.getAnnotation(AnnotationParam.class);  
                 if (paramAnnotations != null) {
@@ -442,8 +509,10 @@ public class Utility {
                         if (this.identifyType( paramType.getSimpleName() )  == false) { // Si c'est un Object 
                             Object objClass = valueArg.get(count); 
                             Field[] fields = paramType.getDeclaredFields(); 
-                            for (Field field : fields) { 
-                                this.manageValidation(myMethod, nameInput, request, field);
+                            for (Field field : fields) {   
+
+                                this.managerValidation(myMethod, nameInput, request, field , partiesInput[1]);
+
                                 Annotation fieldAnnotations = field.getAnnotation(AnnotationField.class);  
                                 if (fieldAnnotations != null) {
                                     AnnotationField annotationField = (AnnotationField) fieldAnnotations;         
@@ -453,7 +522,6 @@ public class Utility {
                                         Method setMethod = paramType.getDeclaredMethod("set" + this.covertMinMaj(field.getName()), field.getType() );  
                                         setMethod.setAccessible(true);     
                                         this.SetAttributeObject2( setMethod , field.getType().getSimpleName()  , objClass ,  partiesInput ,  request )  ;
-                                        //throw new Exception("Count value :"  + count +  "ObjEmp : " + valueArg.get(count) +  " Set Succes2  "  + "set" + this.covertMinMaj(field.getName())   + " fieldType : "  + field.getType()  +  "\n") ;    
                                     } 
                                 }
                               
@@ -468,6 +536,106 @@ public class Utility {
         }
     }  
 
+    public boolean CheckAnnotationMethod ( Method myMethod ,  String normalizedPath , String packageName  , String pathValidation ){ 
+        try {
+            
+            File classpathDirectory = new File(normalizedPath) ; 
+            for ( File file : classpathDirectory.listFiles() )   
+            {
+                if(file.isFile() && file.getName().endsWith(".class"))
+                {   
+                    String className = file.getName().substring( 0 , file.getName().length() - 6 ) ; 
+                    String trueClassName = this.fusionPackageAndClassName(className , packageName); 
+                    //Transformation en classe
+                    Class<?> myclass = Thread.currentThread().getContextClassLoader().loadClass(trueClassName) ; 
+                    Method [] methods = myclass.getDeclaredMethods() ;
+                        for (Method method : methods)
+                            if(method.isAnnotationPresent(Url.class)   )  
+                            { 
+                                Url methodAnnotation = method.getAnnotation(Url.class);  
+                                if( methodAnnotation.nameUrl().equals(  pathValidation ) )  { 
+                                    System.out.println( "method Annoter :" +  methodAnnotation.nameUrl() + "\n" ) ;
+                                    System.out.println( "path validation :" + pathValidation  + "\n" ) ; 
+                                return true ; } 
+                            }  
+                    } 
+            } 
+            return false ;    
+        } catch (Exception e) {
+          e.printStackTrace(); 
+          System.out.println(e);
+        }
+        return false ; 
+    }
+
+
+    //Authentification 
+    public List<AuthLevel> getAuthLevels(String authFilePath) throws Exception {
+    List<AuthLevel> authLevels = new ArrayList<>();
+    try (BufferedReader reader = new BufferedReader(new FileReader(authFilePath))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+            // Supposons que les lignes du fichier suivent le format : "name level"
+            String[] parts = line.trim().split("\\s+");
+            if (parts.length == 2) {
+                String nameAuth = parts[0];
+                int level = Integer.parseInt(parts[1]);
+                authLevels.add(new AuthLevel(nameAuth, level));
+            }
+        }
+    } catch (Exception e) {
+        throw new Exception("Erreur lors de la lecture du fichier auth.txt", e);
+    }
+         return authLevels;
+    }
+
+    public void CheckAnnotationAuth (Method myMethod ,  String normalizedPath , String packageName , HttpServletRequest request , String authSessionName , List<AuthLevel> ls_AuthLevels) throws Exception{ 
+        try {     
+            File classpathDirectory = new File(normalizedPath) ; 
+            for ( File file : classpathDirectory.listFiles() )   
+            {
+                if(file.isFile() && file.getName().endsWith(".class"))
+                {   
+                    String className = file.getName().substring( 0 , file.getName().length() - 6 ) ; 
+                    String trueClassName = this.fusionPackageAndClassName(className , packageName); 
+                    //Transformation en classe
+                    Class<?> myclass = Thread.currentThread().getContextClassLoader().loadClass(trueClassName) ; 
+                    Method [] methods = myclass.getDeclaredMethods() ;
+                        for (Method method : methods)
+                            if(method.isAnnotationPresent(AnnotationAuth.class) && myMethod.getName().equals(method.getName()))  
+                            { 
+                                AnnotationAuth authAnnotation = method.getAnnotation(AnnotationAuth.class);
+                                MySession sessionAuth = new MySession (request.getSession() ) ;
+                                this.verifyLevelAuthentification(sessionAuth , ls_AuthLevels , authAnnotation , authSessionName ) ;
+                            }  
+                    } 
+            } 
+        } catch (Exception e) {
+           e.printStackTrace();
+           throw e; 
+        }
+    }
+
+    public int addLevelAuthName( String authName , List<AuthLevel> authLevels ) { 
+        for( AuthLevel authLevel : authLevels ) { 
+            if( authName.equals(authLevel.getNameAuth() ) )  {
+                return authLevel.getLevel() ;
+            }
+        }
+        return -1 ;  
+    }
+    
+    public void verifyLevelAuthentification ( MySession sessionAuth , List<AuthLevel> ls_AuthLevels , AnnotationAuth authAnnotation  , String authSession ) throws Exception {   
+       if (!authAnnotation.name().equals((String) sessionAuth.getSession(authSession))) { 
+            String authNameAnnotation = authAnnotation.name() ;  
+            String authNameSession = (String) sessionAuth.getSession( authSession ) ;
+            int levelauthNameAnnotation = this.addLevelAuthName( authNameAnnotation, ls_AuthLevels) ; 
+            int levelauthNameSession = this.addLevelAuthName(authNameSession, ls_AuthLevels) ; 
+            if( levelauthNameAnnotation > levelauthNameSession ) {
+                throw new Exception("Vous n'avez pas les droits pour effectuer cette action");
+            }
+        }
+    } 
 }
 
 

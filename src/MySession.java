@@ -20,6 +20,6 @@ public class MySession {
     } 
     public void deleteSession( String key ) 
     { 
-        this.session.removeAttribute("username");
+        this.session.removeAttribute(key );  
     }
 }
